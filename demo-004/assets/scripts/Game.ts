@@ -2,22 +2,20 @@ import {
   _decorator,
   Component,
   Node,
-  EventTarget,
+  Label,
   Input,
   input,
   Tween,
   tween,
   Vec3,
-  Director,
+  director,
+  Sprite,
+  ParticleSystem2D,
 } from "cc";
 const { ccclass, property } = _decorator;
 
-const eventTarget = new EventTarget();
-
 @ccclass("Game")
 export class Game extends Component {
-  private user_exp = 0; // 用户经验
-
   @property({ type: Node })
   private bulletNode: Node = null; // 绑定bullet节点
   private bulletTween: Tween<Node> = null; // 绑定bullet缓动对象
@@ -26,24 +24,50 @@ export class Game extends Component {
   private enemyNode: Node = null; // 绑定enemy节点
   private enemyTween: Tween<Node> = null; // 绑定enemy缓动对象
 
+  @property({ type: Label })
+  private scoreLabel: Label = null; // 绑定scoreLabel节点
+  private score: number = 0; // 绑定score变量
+
+  @property({ type: Node })
+  private boomNode: Node = null; // 绑定boom节点
+
   private gameState: number = 0; // 0: 子弹未发射，1:子弹已发射，2:游戏结束
 
-  protected onLoad(): void {
-    eventTarget.on("incr_exp", (exp) => {
-      this.user_exp += exp;
-
-      console.log("获得了" + exp + "点经验，当前经验值：" + this.user_exp);
-    });
-
+  start() {
     // 手指落在目标节点区域时
-    input.on(Input.EventType.TOUCH_START, this.fire, this);
+    this.node.on(Input.EventType.TOUCH_START, this.fire, this);
 
+    this.newRound();
+  }
+
+  update(deltaTime: number) {
+    this.checkHit(); // 检测子弹是否击中目标节点
+  }
+
+  protected onDestroy(): void {
+    input.off(Input.EventType.TOUCH_START, this.fire, this);
+  }
+
+  // 新一轮游戏
+  newRound() {
     this.initEnemy(); // 初始化enemy节点
+    this.initBullet(); // 初始化bullet节点
+
+    this.gameState = 0; // 重置游戏状态变量
   }
 
   initEnemy() {
+    if (this.enemyTween != null) {
+      this.enemyTween.stop(); // 停止enemy缓动
+    }
+
     let stPos = new Vec3(300, 260, 0); // 初始位置
-    let duration = 1.5; // 缓动时间
+    stPos.y = stPos.y + Math.random() * 100; // 随机位置
+    if (Math.random() > 0.5) {
+      stPos.x = -stPos.x; // 随机方向
+    }
+
+    let duration = 1.5 - Math.random() * 0.5; // 缓动时间
 
     this.enemyNode.setPosition(stPos); // 设置初始位置
     this.enemyNode.active = true; // 显示目标节点
@@ -56,20 +80,11 @@ export class Game extends Component {
       .start(); // 启动缓动
   }
 
-  protected onDestroy(): void {
-    input.off(Input.EventType.TOUCH_START, this.fire, this);
-  }
+  initBullet() {
+    let stPos = new Vec3(0, -340, 0); // 初始位置
 
-  start() {
-    eventTarget.emit("incr_exp", 5);
-
-    setInterval(() => {
-      eventTarget.emit("incr_exp", 1);
-    }, 1000);
-  }
-
-  update(deltaTime: number) {
-    this.checkHit(); // 检测子弹是否击中目标节点
+    this.bulletNode.setPosition(stPos); // 设置初始位置
+    this.bulletNode.active = true; // 显示子弹节点
   }
 
   // 发射子弹
@@ -80,7 +95,7 @@ export class Game extends Component {
 
     console.log("发射子弹");
 
-    tween(this.bulletNode) // 指定缓动对象
+    this.bulletTween = tween(this.bulletNode) // 指定缓动对象
       .to(0.6, { position: new Vec3(0, 600, 0) }) // 对象在0.6s内移动到目标位置
       .call(() => {
         this.gameOver(); // 子弹击中目标节点后游戏结束
@@ -88,11 +103,34 @@ export class Game extends Component {
       .start(); // 启动缓动
   }
 
+  // 播放例子效果
+  boom(pos, color) {
+    this.boomNode.setPosition(pos);
+
+    // 获取组件方法 getComponent
+    let particle = this.boomNode.getComponent(ParticleSystem2D);
+
+    // 注意-样例代码错误
+    if (color != undefined) {
+      particle.startColor = particle.endColor = color;
+    }
+
+    particle.resetSystem();
+  }
+
   gameOver() {
     console.log("游戏结束");
-
     this.gameState = 2; // 修改游戏结束标记变量
-    Director.instance.loadScene("Game"); // 重新加载Game场景
+
+    // 播放粒子，子弹的颜色
+    let bulletColor = this.bulletNode.getComponent(Sprite).color;
+    this.boom(this.bulletNode.position, bulletColor);
+
+    // 延时1s，用于播放粒子
+    setTimeout(() => {
+      // 重新加载场景
+      director.loadScene("Game", (err, scene) => {});
+    }, 1000);
   }
 
   // 检测命中
@@ -103,10 +141,19 @@ export class Game extends Component {
 
     if (dis < 50) {
       this.bulletTween.stop(); // 停止子弹缓动
+      this.enemyTween.stop(); // 停止enemy缓动
       this.gameState = 2; // 修改游戏结束标记变量
 
       this.bulletNode.active = false; // 隐藏子弹节点
       this.enemyNode.active = false; // 隐藏目标节点
+
+      this.incScore(); // 增加分数
+      this.newRound(); // 开始新一轮游戏
     }
+  }
+
+  incScore() {
+    this.score++;
+    this.scoreLabel.string = String(this.score); // 更新scoreLabel节点显示
   }
 }
