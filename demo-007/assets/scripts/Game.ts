@@ -39,14 +39,97 @@ export class Game extends Component {
     this.initPlayer();
   }
 
+  playerAttack() {
+    if (this.turnNum != 0) return; // 不是自己的回合不能行动
+    if (this.playerAp <= 0) return;
+
+    this.playerAp--; // 消耗一个行动点
+    this.playerMp += this.incrMp; // 自然法力恢复
+
+    if (this.playerMp > this.playerMaxMp) {
+      this.playerMp = this.playerMaxMp;
+    }
+
+    // TODO: 播放敌人受攻击动画
+
+    this.enemyHp -= this.playerArk;
+
+    if (this.enemyHp <= 0) {
+      this.enemyDie();
+      return;
+    }
+
+    this.updateEnemyHp(this.enemyHp);
+    this.updatePlayerAp(this.playerAp);
+    this.updatePlayerMp(this.playerMp);
+
+    this.checkEnemyAction();
+  }
+
+  playerHeal() {
+    if (this.turnNum != 0) return; // 不是自己的回合不能行动
+    if (this.playerAp <= 0 || this.playerMp < this.healMpCost) return;
+
+    this.playerAp--; // 消耗一个行动点
+    this.playerMp -= this.healMpCost; // 消耗法力值
+    this.playerHp += this.healHp;
+
+    if (this.playerHp > this.playerMaxHp) {
+      this.playerHp = this.playerMaxHp;
+    }
+
+    this.updatePlayerHp(this.playerHp);
+    this.updatePlayerAp(this.playerAp);
+    this.updatePlayerMp(this.playerMp);
+
+    this.checkEnemyAction();
+  }
+
+  checkEnemyAction() {
+    if (this.turnNum == 0 && this.playerAp <= 0) {
+      this.turnNum = 1;
+      this.enemyAttack();
+    }
+  }
+
+  enemyAttack() {
+    const atk = this.enemyAtk;
+
+    if (this.turnNum != 1) return; // 不是自己的回合不能行动
+
+    this.playerHp--;
+    this.updatePlayerHp(this.playerHp);
+
+    // TODO: 播放玩家受攻击动画
+
+    if (this.playerHp <= 0) {
+      console.log("游戏结束");
+      return;
+    }
+
+    this.turnNum = 0;
+    this.updatePlayerAp(this.playerMaxAp);
+  }
+
+  enemyDie() {
+    this.enemyAreaNode.active = false;
+
+    this.nextRoom();
+  }
+
+  nextRoom() {
+    console.log("进入下一个房间");
+
+    this.initEnemy();
+    this.turnNum = 0;
+    this.updatePlayerAp(this.playerMaxAp);
+  }
+
+  //#region 初始化
+
   initEnemy() {
     this.updateEnemyHp(this.enemyMaxHp);
     this.enemyAreaNode.active = true;
-  }
-
-  updateEnemyHp(hp: number) {
-    this.enemyHp = hp;
-    this.enemyHpLabel.string = `${this.enemyHp}hp`;
   }
 
   initPlayer() {
@@ -55,16 +138,29 @@ export class Game extends Component {
     this.updatePlayerMp(this.playerMaxMp);
   }
 
+  //#endregion
+
+  //#region 修改
+
+  updateEnemyHp(hp: number) {
+    this.enemyHp = hp;
+    this.enemyHpLabel.string = `${this.enemyHp}hp`;
+  }
+
   updatePlayerHp(hp: number) {
     this.playerHp = hp;
-    this.playerHpLabel.string = `${this.playerHp}hp`;
+    this.playerHpLabel.string = `HP\n${this.playerHp}`;
   }
+
   updatePlayerAp(ap: number) {
     this.playerAp = ap;
-    this.playerApLabel.string = `${this.playerAp}ap`;
+    this.playerApLabel.string = `AP\n${this.playerAp}`;
   }
+
   updatePlayerMp(mp: number) {
     this.playerMp = mp;
-    this.playerMpLabel.string = `${this.playerMp}mp`;
+    this.playerMpLabel.string = `MP\n${this.playerMp}`;
   }
+
+  //#endregion
 }
