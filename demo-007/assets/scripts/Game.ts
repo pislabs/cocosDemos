@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node } from "cc";
+import { _decorator, Component, Label, Node, Animation } from "cc";
 const { ccclass, property } = _decorator;
 
 @ccclass("Game")
@@ -24,6 +24,12 @@ export class Game extends Component {
   @property({ type: Node })
   private enemyAreaNode: Node = null;
 
+  @property({ type: Node })
+  private nexBtnNode: Node = null;
+
+  @property({ type: Animation })
+  private bgAni: Animation = null;
+
   @property({ type: Label })
   private enemyHpLabel: Label = null;
 
@@ -37,6 +43,24 @@ export class Game extends Component {
   start() {
     this.initEnemy();
     this.initPlayer();
+
+    this.bgAni.on(Animation.EventType.FINISHED, this.bgAniFinish, this);
+
+    let ani = this.enemyAreaNode.getComponent(Animation);
+    ani.on(
+      Animation.EventType.FINISHED,
+      () => {
+        this.turnNum = 0;
+      },
+      this
+    );
+  }
+
+  bgAniFinish() {
+    this.initEnemy();
+
+    this.turnNum = 0;
+    this.updatePlayerAp(this.playerMaxAp);
   }
 
   playerAttack() {
@@ -50,7 +74,9 @@ export class Game extends Component {
       this.playerMp = this.playerMaxMp;
     }
 
-    // TODO: 播放敌人受攻击动画
+    // 播放敌人受攻击动画
+    let ani = this.enemyAreaNode.getComponent(Animation);
+    ani.play("hurt");
 
     this.enemyHp -= this.playerArk;
 
@@ -100,29 +126,35 @@ export class Game extends Component {
     this.playerHp--;
     this.updatePlayerHp(this.playerHp);
 
-    // TODO: 播放玩家受攻击动画
+    // 播放玩家受攻击动画
+    let ani = this.enemyAreaNode.getComponent(Animation);
+    ani.play("attack");
 
     if (this.playerHp <= 0) {
       console.log("游戏结束");
       return;
     }
 
-    this.turnNum = 0;
+    // this.turnNum = 0;
     this.updatePlayerAp(this.playerMaxAp);
   }
 
   enemyDie() {
     this.enemyAreaNode.active = false;
+    this.nexBtnNode.active = true;
 
-    this.nextRoom();
+    // this.nextRoom();
   }
 
   nextRoom() {
     console.log("进入下一个房间");
 
-    this.initEnemy();
-    this.turnNum = 0;
-    this.updatePlayerAp(this.playerMaxAp);
+    let ani = this.enemyAreaNode.getComponent(Animation);
+    ani.stop();
+
+    this.bgAni.play("interlude");
+
+    this.nexBtnNode.active = false;
   }
 
   //#region 初始化
